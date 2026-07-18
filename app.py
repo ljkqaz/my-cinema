@@ -122,15 +122,41 @@ if st.button("🔮 나의 진로 성향 분석 및 영화 추천받기"):
     df_report["매칭 확률"] = df_report["매칭 확률"].map(lambda x: f"{x*100:.2f}%")
     st.table(df_report)
 
-# 6. 소감 한 줄 방명록 기능
+# 6. 소감 한 줄 방명록 기능 (영구 누적 저장 패치 완료! 🚀)
 st.write("---")
 st.subheader("💬 추천 서비스 이용 소감 남기기")
 
-if "reviews" not in st.session_state:
-    st.session_state["reviews"] = [
-        {"이름": "확통마스터", "소감": "진짜 베이즈 정리로 내 성향 맞춰서 소름 돋음;;"},
-        {"이름": "영화조아", "소감": "발표용으로 퀄리티 대박이네요. 추천 영화 보러 갑니다."}
-    ]
+# 방명록을 보관할 파일 이름 설정
+CSV_FILE = "reviews.csv"
+
+# [함수 1] 기존에 저장된 방명록 파일 읽어오기
+def load_reviews():
+    if os.path.exists(CSV_FILE):
+        try:
+            # 파일이 있으면 읽어서 리스트로 변환
+            df = pd.read_csv(CSV_FILE, encoding='utf-8-sig')
+            return df.to_dict('records')
+        except:
+            return []
+    else:
+        # 파일이 아예 처음이라 없을 때 보여줄 기본 예시 데이터
+        return [
+            {"이름": "확통마스터", "소감": "진짜 베이즈 정리로 내 성향 맞춰서 소름 돋음;;"},
+            {"이름": "영화조아", "소감": "발표용으로 퀄리티 대박이네요. 추천 영화 보러 갑니다."}
+        ]
+
+# [함수 2] 새 방명록을 파일에 영구 추가하기
+def save_review(name, content):
+    new_data = pd.DataFrame([{"이름": name, "소감": content}])
+    if not os.path.exists(CSV_FILE):
+        # 파일이 처음 만들어질 때
+        new_data.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+    else:
+        # 이미 파일이 있으면 맨 아래에 한 줄 추가(append)
+        new_data.to_csv(CSV_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
+
+# 파일로부터 현재까지 누적된 방명록 데이터 불러오기
+current_reviews = load_reviews()
 
 col1, col2 = st.columns([1, 3])
 with col1:
@@ -139,13 +165,16 @@ with col2:
     user_review = st.text_input("한 줄 소감", placeholder="추천 결과에 대한 느낀 점을 남겨주세요!")
 
 if st.button("소감 등록하기"):
-    if user_name and user_review:
-        st.session_state["reviews"].insert(0, {"이름": user_name, "소감": user_review})
+    if user_name.strip() and user_review.strip():
+        # 영구 저장 함수 실행
+        save_review(user_name, user_review)
         st.toast("소감이 성공적으로 등록되었습니다! 📝")
+        # 화면에 즉시 반영되도록 새로고침
         st.rerun()
     else:
         st.warning("닉네임과 소감을 모두 입력해 주세요!")
 
 st.write("### 📌 친구들이 남긴 소감 한 줄")
-for review in st.session_state["reviews"]:
+# 가장 최근에 쓴 글이 맨 위로 올라오도록 역순(reversed)으로 출력
+for review in reversed(current_reviews):
     st.write(f"**👤 {review['이름']}** : {review['소감']}")
